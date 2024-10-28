@@ -1,5 +1,6 @@
 import { ProductDTO } from '../models/product.model';
 
+// all  products
 export const allStaticProducts: ProductDTO[] = [
     {
         "count": 4,
