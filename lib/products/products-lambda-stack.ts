@@ -79,6 +79,7 @@ export class ProductsLambdaStack extends cdk.Stack {
             }
         });
 
+        // give the lambda permissions to write to the DynamoDB table
         productsTable.grantWriteData(addProductLambda);
         stockTable.grantWriteData(addProductLambda);
 

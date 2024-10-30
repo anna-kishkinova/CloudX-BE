@@ -1,5 +1,5 @@
-import { DynamoDBClient, ScanCommand } from "@aws-sdk/client-dynamodb";
-import { ProductDTO } from './models/product.model';
+import { DynamoDBClient, PutItemCommand, ScanCommand } from "@aws-sdk/client-dynamodb";
+import { ProductDTO, ProductModel } from './models/product.model';
 
 const dynamoDB = new DynamoDBClient({ region: process.env.AWS_REGION });
 export const productsTableName = process.env.PRODUCTS_TABLE_NAME as string;
@@ -61,4 +61,46 @@ export async function getProductByIdFromDB(id: string): Promise<ProductDTO> {
         console.error('Error fetching data:', error);
     }
     return {} as ProductDTO;
+}
+
+export async function addItemToProductTable(item: ProductModel): Promise<ProductDTO> {
+    try {
+        const productId = generateId();
+        const addProductCommand = new PutItemCommand({
+            TableName: productsTableName,
+            Item: {
+                id: { S: productId },
+                title: { S: item.title },
+                description: { S: item.description },
+                price: { N: item.price.toString() },
+            }
+        });
+        const productResult = await dynamoDB.send(addProductCommand);
+        console.log('add product command succeeded:', JSON.stringify(productResult, null, 2));
+
+        const addStockCommand = new PutItemCommand({
+            TableName: stockTableName,
+            Item: {
+                product_id: { S: productId },
+                count: { N: item.count.toString() },
+            }
+        });
+        const stockResult = await dynamoDB.send(addStockCommand);
+        console.log('createStockCommand succeeded:', JSON.stringify(stockResult, null, 2));
+
+        return {
+            id: productId,
+            title: item.title,
+            description: item.description,
+            price: item.price,
+            count: item.count,
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        throw new Error('Error adding item to DynamoDB table');
+    }
+}
+
+export function generateId(): string {
+    return new Date().getTime().toString();
 }
