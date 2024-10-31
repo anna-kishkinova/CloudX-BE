@@ -26,7 +26,7 @@ export class ImportServiceStack extends cdk.Stack {
             runtime: lambda.Runtime.NODEJS_20_X,
             memorySize: 1024,
             timeout: cdk.Duration.seconds(5),
-            handler: 'handler.importProductsFile',
+            handler: 'import-service-handler.importProductsFile',
             code: lambda.Code.fromAsset(path.join(__dirname, './')),
             environment: {
                 BUCKET_NAME: bucket.bucketName,
@@ -52,18 +52,34 @@ export class ImportServiceStack extends cdk.Stack {
         const importFileParserLambda = new lambda.Function(this, 'import-file-parser', {
             runtime: lambda.Runtime.NODEJS_20_X,
             memorySize: 1024,
-            timeout: cdk.Duration.seconds(5),
-            handler: 'handler.importFileParser',
+            timeout: cdk.Duration.seconds(10),
+            handler: 'import-service-handler.importFileParser',
             code: lambda.Code.fromAsset(path.join(__dirname, './')),
-            environment: {
-                BUCKET_NAME: bucket.bucketName,
-            }
         });
 
-        // addEventNotification is a method that allows you to add a notification configuration to the bucket
+        bucket.grantReadWrite(importFileParserLambda);
+
+        // trigger the lambda function when a file is copied from uploaded to parsed folder
+        const removeFileLambda = new lambda.Function(this, 'remove-file', {
+            runtime: lambda.Runtime.NODEJS_20_X,
+            memorySize: 1024,
+            timeout: cdk.Duration.seconds(5),
+            handler: 'import-service-handler.removeFile',
+            code: lambda.Code.fromAsset(path.join(__dirname, './')),
+        });
+
+        bucket.grantDelete(removeFileLambda);
+
+        bucket.addEventNotification(
+            s3.EventType.OBJECT_CREATED_PUT,
+            new s3Notifications.LambdaDestination(importFileParserLambda),
+            { prefix: 'uploaded' },
+        );
+
         bucket.addEventNotification(
             s3.EventType.OBJECT_CREATED,
-            new s3Notifications.LambdaDestination(importFileParserLambda),
+            new s3Notifications.LambdaDestination(removeFileLambda),
+            { prefix: 'parsed' },
         );
     }
 }
