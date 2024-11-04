@@ -5,9 +5,7 @@ import { Construct } from 'constructs';
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { join } from 'path';
-
-const productsTableName = 'products';
-const stockTableName = 'stock';
+import { productsTableName, stockTableName } from './constants/constants';
 
 export class ProductsLambdaStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -41,7 +39,7 @@ export class ProductsLambdaStack extends cdk.Stack {
             runtime: lambda.Runtime.NODEJS_20_X,
             memorySize: 1024,
             timeout: cdk.Duration.seconds(5),
-            handler: 'handler.createData',
+            handler: 'products-lambda-handler.createData',
             code: lambda.Code.fromAsset(join(__dirname, './')),
             environment: {
                 PRODUCTS_TABLE_NAME: productsTableName,
@@ -56,7 +54,7 @@ export class ProductsLambdaStack extends cdk.Stack {
             runtime: lambda.Runtime.NODEJS_20_X,
             memorySize: 1024,
             timeout: cdk.Duration.seconds(5),
-            handler: 'handler.main',
+            handler: 'products-lambda-handler.main',
             code: lambda.Code.fromAsset(path.join(__dirname, './')),
             environment: {
                 PRODUCTS_TABLE_NAME: productsTableName,
@@ -71,7 +69,7 @@ export class ProductsLambdaStack extends cdk.Stack {
             runtime: lambda.Runtime.NODEJS_20_X,
             memorySize: 1024,
             timeout: cdk.Duration.seconds(5),
-            handler: 'handler.addProduct',
+            handler: 'products-lambda-handler.addProduct',
             code: lambda.Code.fromAsset(path.join(__dirname, './')),
             environment: {
                 PRODUCTS_TABLE_NAME: productsTableName,

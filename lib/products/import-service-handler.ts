@@ -9,18 +9,19 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
 import * as csv from 'csv-parser';
+const { SQSClient, SendMessageCommand } = require('@aws-sdk/client-sqs');
 
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
 const bucketName = process.env.BUCKET_NAME as string;
 const bucketKey = process.env.BUCKET_KEY as string;
 
+const sqsClient = new SQSClient({ region: process.env.AWS_REGION });
+const QUEUE_URL = process.env.CATALOG_ITEMS_QUEUE_URL;
+
 export async function importProductsFile(event: any) {
     const filePath = `${ bucketKey }/${ event.pathParameters.fileName }`;
     const client = new S3Client({});
-    const command = new PutObjectCommand({
-        Bucket: bucketName,
-        Key: filePath,
-    });
+    const command = new PutObjectCommand({ Bucket: bucketName, Key: filePath });
 
     try {
         const signedUrl = await getSignedUrl(client, command);
@@ -55,14 +56,8 @@ export async function importFileParser(event: any) {
             const { Body } = response;
 
             if (Body instanceof Readable) {
-                Body
-                .pipe(csv())
-                .on('data', (data) => (console.log('Record:', JSON.stringify(data))))
-                .on('end', async () => {
-                    const fileName = key.split('/').pop();
-                    await moveFile(bucketNameImport, key, `parsed/${fileName}`);
-                })
-                .on('error', (err) => (console.error(`Error processing file ${key}:`, err)));
+                const csvRecords = await parseCSV(Body, key, bucketNameImport);
+                await sendRecordsToSQS(csvRecords);
             } else {
                 console.error(`Body is not a readable stream for file: ${key}`);
             }
@@ -77,7 +72,34 @@ export async function importFileParser(event: any) {
     };
 }
 
-async function moveFile(bucketNameCopy: string, sourceKey: string, destinationKey: string) {
+async function parseCSV(fileContent: any, key: string, bucketNameImport: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+        const results: any[] = [];
+
+        Readable.from(fileContent)
+        .pipe(csv())
+        .on('data', (data) => results.push(data))
+        .on('end', async () => {
+            const fileName = key.split('/').pop();
+            await moveFile(bucketNameImport, key, `parsed/${ fileName }`);
+
+            resolve(results);
+        })
+        .on('error', (error) => reject(error));
+    });
+}
+
+async function sendRecordsToSQS(records: any[]) {
+    const sendPromises = records.map((record) => {
+        const message = JSON.stringify(record);
+        const params = { QueueUrl: QUEUE_URL, MessageBody: message };
+
+        return sqsClient.send(new SendMessageCommand(params));
+    });
+    await Promise.all(sendPromises);
+}
+
+async function moveFile(bucketNameCopy: string, sourceKey: string, destinationKey: string): Promise<void> {
     try {
         await s3Client.send(
             new CopyObjectCommand({
@@ -99,12 +121,8 @@ export async function removeFile(event: any) {
         const fileName = key.split('/').pop();
 
         try {
-            await s3Client.send(
-                new DeleteObjectCommand({
-                    Bucket: bucketNameDelete,
-                    Key: 'uploaded/' + fileName,
-                }),
-            );
+            await s3Client.send(new DeleteObjectCommand({ Bucket: bucketNameDelete, Key: 'uploaded/' + fileName }));
+
             console.log(`The object "${'uploaded/' + fileName}" from bucket "${bucketNameDelete}" was deleted`);
         } catch (error) {
             console.error(`Error from S3 while deleting object from ${bucketNameDelete}.  ${error}`);

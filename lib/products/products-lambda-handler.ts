@@ -1,7 +1,8 @@
 import { Handler } from 'aws-lambda';
 import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
-import { addItemToProductTable, generateId, getProductByIdFromDB, getProductsFromDB } from './product.service';
+import { addItemToProductTable, getProductByIdFromDB, getProductsFromDB } from './services/product.service';
 import { allStaticProducts } from './mocks/products.mock';
+import { v4 as uuidv4 } from 'uuid';
 
 const dynamoDB = new DynamoDBClient({ region: process.env.AWS_REGION });
 
@@ -37,7 +38,7 @@ export async function addProduct(event: any) {
 export const createData: Handler = async (): Promise<void> => {
     try {
         for (const item of allStaticProducts) {
-            const productId = generateId();
+            const productId = uuidv4();
             const createProductCommand = new PutItemCommand({
                 TableName: productsTableName,
                 Item: {

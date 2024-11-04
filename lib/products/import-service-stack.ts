@@ -5,10 +5,16 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as path from 'node:path';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3Notifications from 'aws-cdk-lib/aws-s3-notifications';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
+
 
 export class ImportServiceStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props?: cdk.StackProps) {
         super(scope, id, props);
+
+        const existingQueueArn = 'arn:aws:sqs:us-east-1:597088041300:CatalogItemsQueue';
+        const catalogItemsQueue = sqs.Queue.fromQueueArn(this, 'ExistingCatalogItemsQueue', existingQueueArn);
+
 
         const bucket = new s3.Bucket(this, 'ImportBucket', {
             versioned: true,
@@ -55,9 +61,14 @@ export class ImportServiceStack extends cdk.Stack {
             timeout: cdk.Duration.seconds(10),
             handler: 'import-service-handler.importFileParser',
             code: lambda.Code.fromAsset(path.join(__dirname, './')),
+            environment: {
+                CATALOG_ITEMS_QUEUE_URL: catalogItemsQueue.queueUrl,
+            },
         });
 
         bucket.grantReadWrite(importFileParserLambda);
+        catalogItemsQueue.grantSendMessages(importFileParserLambda);
+
 
         // trigger the lambda function when a file is copied from uploaded to parsed folder
         const removeFileLambda = new lambda.Function(this, 'remove-file', {

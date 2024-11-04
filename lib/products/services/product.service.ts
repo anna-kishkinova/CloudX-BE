@@ -1,5 +1,6 @@
 import { DynamoDBClient, PutItemCommand, ScanCommand } from "@aws-sdk/client-dynamodb";
-import { ProductDTO, ProductModel } from './models/product.model';
+import { ProductDTO, ProductModel } from '../models/product.model';
+import { v4 as uuidv4 } from 'uuid';
 
 const dynamoDB = new DynamoDBClient({ region: process.env.AWS_REGION });
 export const productsTableName = process.env.PRODUCTS_TABLE_NAME as string;
@@ -65,7 +66,7 @@ export async function getProductByIdFromDB(id: string): Promise<ProductDTO> {
 
 export async function addItemToProductTable(item: ProductModel): Promise<ProductDTO> {
     try {
-        const productId = generateId();
+        const productId = uuidv4();
         const addProductCommand = new PutItemCommand({
             TableName: productsTableName,
             Item: {
@@ -99,8 +100,4 @@ export async function addItemToProductTable(item: ProductModel): Promise<Product
         console.error('Error:', error);
         throw new Error('Error adding item to DynamoDB table');
     }
-}
-
-export function generateId(): string {
-    return new Date().getTime().toString();
 }
