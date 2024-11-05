@@ -48,7 +48,9 @@ export class ProductSqsStack extends cdk.Stack {
         catalogBatchProcess.addEventSource(new SqsEventSource(catalogItemsQueue, { batchSize: 5 }));
 
         productsTable.grantWriteData(catalogBatchProcess);
+        productsTable.grantFullAccess(catalogBatchProcess);
         stockTable.grantWriteData(catalogBatchProcess);
+        stockTable.grantFullAccess(catalogBatchProcess);
 
         // Grant the Lambda function permission to publish to the SNS topic
         createProductTopic.grantPublish(catalogBatchProcess);

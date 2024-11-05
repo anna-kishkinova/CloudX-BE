@@ -9,6 +9,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
 import * as csv from 'csv-parser';
+import { ProductModel } from './models/product.model';
 const { SQSClient, SendMessageCommand } = require('@aws-sdk/client-sqs');
 
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
@@ -48,7 +49,9 @@ export async function importProductsFile(event: any) {
 export async function importFileParser(event: any) {
     for (const record of event.Records) {
         const bucketNameImport = record.s3.bucket.name;
+        console.log('bucketNameImport----', bucketNameImport);
         const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, ' '));
+        console.log('key----', key);
 
         try {
             const command = new GetObjectCommand({ Bucket: bucketNameImport, Key: key });
@@ -56,7 +59,9 @@ export async function importFileParser(event: any) {
             const { Body } = response;
 
             if (Body instanceof Readable) {
+                console.log('parseCSV start----');
                 const csvRecords = await parseCSV(Body, key, bucketNameImport);
+                console.log('csvRecords ------', csvRecords);
                 await sendRecordsToSQS(csvRecords);
             } else {
                 console.error(`Body is not a readable stream for file: ${key}`);
@@ -72,9 +77,9 @@ export async function importFileParser(event: any) {
     };
 }
 
-async function parseCSV(fileContent: any, key: string, bucketNameImport: string): Promise<any> {
+async function parseCSV(fileContent: any, key: string, bucketNameImport: string): Promise<ProductModel[]> {
     return new Promise((resolve, reject) => {
-        const results: any[] = [];
+        const results: ProductModel[] = [];
 
         Readable.from(fileContent)
         .pipe(csv())
@@ -83,20 +88,19 @@ async function parseCSV(fileContent: any, key: string, bucketNameImport: string)
             const fileName = key.split('/').pop();
             await moveFile(bucketNameImport, key, `parsed/${ fileName }`);
 
+            console.log('parseCSV results -----', results);
             resolve(results);
         })
         .on('error', (error) => reject(error));
     });
 }
 
-async function sendRecordsToSQS(records: any[]) {
-    const sendPromises = records.map((record) => {
-        const message = JSON.stringify(record);
-        const params = { QueueUrl: QUEUE_URL, MessageBody: message };
+async function sendRecordsToSQS(records: ProductModel[]): Promise<void> {
+    console.log('records ------', records);
+    const message = JSON.stringify(records);
+    const params = { QueueUrl: QUEUE_URL, MessageBody: message };
 
-        return sqsClient.send(new SendMessageCommand(params));
-    });
-    await Promise.all(sendPromises);
+    await sqsClient.send(new SendMessageCommand(params));
 }
 
 async function moveFile(bucketNameCopy: string, sourceKey: string, destinationKey: string): Promise<void> {

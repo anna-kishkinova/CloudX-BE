@@ -1,4 +1,4 @@
-import { DynamoDBClient, PutItemCommand, ScanCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, PutItemCommand, ScanCommand, BatchWriteItemCommand } from "@aws-sdk/client-dynamodb";
 import { ProductDTO, ProductModel } from '../models/product.model';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -96,6 +96,57 @@ export async function addItemToProductTable(item: ProductModel): Promise<Product
             price: item.price,
             count: item.count,
         }
+    } catch (error) {
+        console.error('Error:', error);
+        throw new Error('Error adding item to DynamoDB table');
+    }
+}
+
+export async function addItemsToProductTable(items: ProductModel[]): Promise<ProductDTO[]> {
+    const preparedProductItems = items.map((item) => {
+        const productId = uuidv4();
+        return {
+            PutRequest: {
+                Item: {
+                    id: { S: productId },
+                    title: { S: item.title },
+                    description: { S: item.description },
+                    price: { N: item.price.toString() },
+                    count: { N: item.count.toString() },
+                }
+            }
+        }
+    });
+    const preparedStockItems = preparedProductItems.map((item) => {
+        return {
+            PutRequest: {
+                Item: {
+                    product_id: { S: item.PutRequest.Item.id.S },
+                    count: { S: item.PutRequest.Item.count.N },
+                }
+            }
+        }
+    });
+    try {
+        const addProductsParams = { RequestItems: { productsTableName: [...preparedProductItems] } };
+        const addProductsCommand = new BatchWriteItemCommand(addProductsParams);
+        const addProductsResult = await dynamoDB.send(addProductsCommand);
+        console.log('add product command succeeded:', JSON.stringify(addProductsResult, null, 2));
+
+        const addStockParams = { RequestItems: { stockTableName: [...preparedStockItems] } };
+        const addStocksCommand = new BatchWriteItemCommand(addStockParams);
+        const addStockResult = await dynamoDB.send(addStocksCommand);
+        console.log('createStockCommand succeeded:', JSON.stringify(addStockResult, null, 2));
+
+        return preparedProductItems.map((item) => {
+            return {
+                id: item.PutRequest.Item.id.S,
+                title: item.PutRequest.Item.title.S,
+                description: item.PutRequest.Item.description.S,
+                price: Number(item.PutRequest.Item.price.N),
+                count: Number(item.PutRequest.Item.count.N),
+            }
+        });
     } catch (error) {
         console.error('Error:', error);
         throw new Error('Error adding item to DynamoDB table');
