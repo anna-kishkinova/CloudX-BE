@@ -16,7 +16,7 @@ export async function main(event: any) {
         statusCode: 200,
         headers: {
             "Access-Control-Allow-Headers": "Content-Type",
-            "Access-Control-Allow-Origin": "https://d3l8dacur07qr1.cloudfront.net",
+            "Access-Control-Allow-Origin": "https://dek2phf9zw8te.cloudfront.net",
             "Access-Control-Allow-Methods": "OPTIONS, GET",
         },
         body: JSON.stringify(productId ? await getProductByIdFromDB(productId) : await getProductsFromDB()),
@@ -28,7 +28,7 @@ export async function addProduct(event: any) {
         statusCode: 200,
         headers: {
             "Access-Control-Allow-Headers": "Content-Type",
-            "Access-Control-Allow-Origin": "https://d3l8dacur07qr1.cloudfront.net",
+            "Access-Control-Allow-Origin": "https://dek2phf9zw8te.cloudfront.net",
             "Access-Control-Allow-Methods": "OPTIONS, POST",
         },
         body: JSON.stringify(await addItemToProductTable(JSON.parse(event.body))),

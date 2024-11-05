@@ -31,7 +31,7 @@ export async function importProductsFile(event: any) {
             statusCode: 200,
             headers: {
                 "Access-Control-Allow-Headers": "Content-Type",
-                "Access-Control-Allow-Origin": "https://d3l8dacur07qr1.cloudfront.net",
+                "Access-Control-Allow-Origin": "https://dek2phf9zw8te.cloudfront.net",
                 "Access-Control-Allow-Methods": "OPTIONS, GET",
             },
             body: JSON.stringify(signedUrl),
@@ -49,9 +49,7 @@ export async function importProductsFile(event: any) {
 export async function importFileParser(event: any) {
     for (const record of event.Records) {
         const bucketNameImport = record.s3.bucket.name;
-        console.log('bucketNameImport----', bucketNameImport);
         const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, ' '));
-        console.log('key----', key);
 
         try {
             const command = new GetObjectCommand({ Bucket: bucketNameImport, Key: key });
@@ -59,9 +57,7 @@ export async function importFileParser(event: any) {
             const { Body } = response;
 
             if (Body instanceof Readable) {
-                console.log('parseCSV start----');
                 const csvRecords = await parseCSV(Body, key, bucketNameImport);
-                console.log('csvRecords ------', csvRecords);
                 await sendRecordsToSQS(csvRecords);
             } else {
                 console.error(`Body is not a readable stream for file: ${key}`);
@@ -88,7 +84,6 @@ async function parseCSV(fileContent: any, key: string, bucketNameImport: string)
             const fileName = key.split('/').pop();
             await moveFile(bucketNameImport, key, `parsed/${ fileName }`);
 
-            console.log('parseCSV results -----', results);
             resolve(results);
         })
         .on('error', (error) => reject(error));
@@ -96,7 +91,6 @@ async function parseCSV(fileContent: any, key: string, bucketNameImport: string)
 }
 
 async function sendRecordsToSQS(records: ProductModel[]): Promise<void> {
-    console.log('records ------', records);
     const message = JSON.stringify(records);
     const params = { QueueUrl: QUEUE_URL, MessageBody: message };
 

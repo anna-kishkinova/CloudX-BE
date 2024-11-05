@@ -12,8 +12,6 @@ export async function getProductsFromDB(): Promise<ProductDTO[]> {
         const stockData = await dynamoDB.send(new ScanCommand({ TableName: stockTableName }));
 
         if (products.Items && stockData.Items) {
-            console.log('Data retrieved:', products.Items);
-
             return products.Items.map((item) => {
                 const stockItem = stockData.Items?.find((stock) => stock.product_id.S === item.id.S);
 
@@ -122,18 +120,20 @@ export async function addItemsToProductTable(items: ProductModel[]): Promise<Pro
             PutRequest: {
                 Item: {
                     product_id: { S: item.PutRequest.Item.id.S },
-                    count: { S: item.PutRequest.Item.count.N },
+                    count: { N: item.PutRequest.Item.count.N },
                 }
             }
         }
     });
     try {
-        const addProductsParams = { RequestItems: { productsTableName: [...preparedProductItems] } };
+        const addProductsParams = {
+            RequestItems: { [productsTableName]: [...preparedProductItems] },
+        };
         const addProductsCommand = new BatchWriteItemCommand(addProductsParams);
         const addProductsResult = await dynamoDB.send(addProductsCommand);
         console.log('add product command succeeded:', JSON.stringify(addProductsResult, null, 2));
 
-        const addStockParams = { RequestItems: { stockTableName: [...preparedStockItems] } };
+        const addStockParams = { RequestItems: { [stockTableName]: [...preparedStockItems] } };
         const addStocksCommand = new BatchWriteItemCommand(addStockParams);
         const addStockResult = await dynamoDB.send(addStocksCommand);
         console.log('createStockCommand succeeded:', JSON.stringify(addStockResult, null, 2));

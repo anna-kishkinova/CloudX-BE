@@ -12,18 +12,11 @@ export async function catalogBatchProcess(event: SQSEvent) {
     for (const record of event.Records) {
         const products = JSON.parse(record.body);
 
-        console.log('body-------', products);
-
         try {
             const res = await addItemsToProductTable(products);
-            console.log(`Products created: ${ JSON.stringify(products) }`);
-
             await sendSnsMessage(res);
-            console.log(`Notification sent: ${ JSON.stringify(res) }`);
-
         } catch (error: any) {
             console.error(`Error creating product: ${ error.message }`);
-
             throw new Error(`Failed to create product: ${ JSON.stringify(products) }`);
         }
     }
