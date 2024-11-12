@@ -6,6 +6,8 @@ import * as path from 'node:path';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3Notifications from 'aws-cdk-lib/aws-s3-notifications';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
+import { importProductsFileApiId } from './constants/constants';
+import * as iam from 'aws-cdk-lib/aws-iam';
 
 
 export class ImportServiceStack extends cdk.Stack {
@@ -13,8 +15,8 @@ export class ImportServiceStack extends cdk.Stack {
         super(scope, id, props);
 
         const existingQueueArn = 'arn:aws:sqs:us-east-1:597088041300:CatalogItemsQueue';
+        const authorizationLambdaArn = 'arn:aws:lambda:us-east-1:597088041300:function:AuthorizationServiceStack-authorizationlambda16478-5alkJEBxyNvh';
         const catalogItemsQueue = sqs.Queue.fromQueueArn(this, 'ExistingCatalogItemsQueue', existingQueueArn);
-
 
         const bucket = new s3.Bucket(this, 'ImportBucket', {
             versioned: true,
@@ -42,17 +44,43 @@ export class ImportServiceStack extends cdk.Stack {
 
         bucket.grantReadWrite(importProductsFile);
 
-        const api = new apigateway.RestApi(this, "importProductsFile-api", {
+        const ProductsLambdaIntegration = new apigateway.LambdaIntegration(importProductsFile);
+
+        // add authorization to the lambda function
+        const existingAuthorizationLambda = lambda.Function.fromFunctionArn(
+            this,
+            'ImportedAuthorizationLambda',
+            authorizationLambdaArn
+        );
+
+        const api = new apigateway.RestApi(this, importProductsFileApiId, {
             restApiName: "importProductsFile API Gateway",
             description: "This API serves the Lambda functions."
         });
 
-        const ProductsLambdaIntegration = new apigateway.LambdaIntegration(importProductsFile);
+        existingAuthorizationLambda.addPermission('AllowAPIGatewayInvoke', {
+            principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+            action: 'lambda:InvokeFunction',
+            sourceArn: api.arnForExecuteApi(),
+        });
+
+        const lambdaAuthorizer = new apigateway.RequestAuthorizer(this, 'LambdaAuthorizerFn', {
+            handler: existingAuthorizationLambda,
+            identitySources: [apigateway.IdentitySource.header('Authorization')],
+            assumeRole: new iam.Role(this, 'LambdaAuthorizerRole', {
+                assumedBy: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+            }),
+        });
 
         // add GET method
         const importProductsFileResource = api.root.addResource("import");
         const importProductsFileNameResource = importProductsFileResource.addResource('{fileName}');
-        importProductsFileNameResource.addMethod('GET', ProductsLambdaIntegration);
+        importProductsFileNameResource.addMethod('GET', ProductsLambdaIntegration,
+            {
+                authorizer: lambdaAuthorizer,
+                authorizationType: apigateway.AuthorizationType.CUSTOM,
+            },
+        );
 
         // trigger the lambda function when a file is uploaded to the bucket
         const importFileParserLambda = new lambda.Function(this, 'import-file-parser', {
@@ -68,7 +96,6 @@ export class ImportServiceStack extends cdk.Stack {
 
         bucket.grantReadWrite(importFileParserLambda);
         catalogItemsQueue.grantSendMessages(importFileParserLambda);
-
 
         // trigger the lambda function when a file is copied from uploaded to parsed folder
         const removeFileLambda = new lambda.Function(this, 'remove-file', {
