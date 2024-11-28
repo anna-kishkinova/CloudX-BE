@@ -8,12 +8,12 @@ import { Construct } from 'constructs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import { join } from 'path';
 
-export class LambdaNestAppStackv23 extends cdk.Stack {
+export class LambdaNestAppStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props?: cdk.StackProps) {
         super(scope, id, props);
 
-        const dbCredentialsSecret = new secretsmanager.Secret(this, 'DBCartSecretv23', {
-                secretName: 'DBCartSecretNamev23',
+        const dbCredentialsSecret = new secretsmanager.Secret(this, 'DBCartSecret', {
+                secretName: 'DBCartSecretName',
                 generateSecretString: {
                     secretStringTemplate: JSON.stringify({ username: 'myadminuser' }),
                     excludePunctuation: true,
@@ -25,7 +25,7 @@ export class LambdaNestAppStackv23 extends cdk.Stack {
 
         const vpc = new ec2.Vpc(this, 'CartVpc', { maxAzs: 3, natGateways: 1 });
 
-        const dbInstance = new rds.DatabaseInstance(this, 'CartDBInstancev23', {
+        const dbInstance = new rds.DatabaseInstance(this, 'CartDBInstance', {
             engine: rds.DatabaseInstanceEngine.postgres({
                 version: rds.PostgresEngineVersion.VER_16_4,
             }),
@@ -45,7 +45,7 @@ export class LambdaNestAppStackv23 extends cdk.Stack {
             credentials: rds.Credentials.fromSecret(dbCredentialsSecret),
         });
 
-        const lambdaFunction = new lambdaNodejs.NodejsFunction(this, 'NestJsLambdaFunctionv23', {
+        const lambdaFunction = new lambdaNodejs.NodejsFunction(this, 'NestJsLambdaFunction', {
             runtime: lambda.Runtime.NODEJS_20_X,
             entry: join(__dirname, '..', '..', 'nodejs-aws-cart-api', 'dist', 'main.js'),
             handler: 'handler',
