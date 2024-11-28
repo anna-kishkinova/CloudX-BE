@@ -6,13 +6,16 @@ import { ImportServiceStack } from '../lib/products/import-service-stack';
 import { ProductSqsStack } from '../lib/products/product-sqs-stack';
 import { ProductSnsStack } from '../lib/product-sns/product-sns-stack';
 import { AuthorizationServiceStack } from '../lib/products/authorization-service-stack';
+import { LambdaNestAppStack } from '../lib/rds/lambda-nest-app-stack';
 
 const app = new cdk.App();
-new AuthorizationServiceStack(app, 'AuthorizationServiceStack');
-new ProductsLambdaStack(app, 'ProductsLambdaStack');
-new ProductSqsStack(app, "ProductSqsStack");
-new ImportServiceStack(app, 'ImportServiceStack', {});
-new ProductSnsStack(app, "ProductSnsStack");
+const envAPS  = { account: '597088041300', region: 'us-east-1' };
+// new AuthorizationServiceStack(app, 'AuthorizationServiceStack');
+// new ProductsLambdaStack(app, 'ProductsLambdaStack');
+// new ProductSqsStack(app, "ProductSqsStack");
+// new ImportServiceStack(app, 'ImportServiceStack', {});
+// new ProductSnsStack(app, "ProductSnsStack");
+new LambdaNestAppStack(app, "LambdaNestAppStack", { env: envAPS });
 
 
 
